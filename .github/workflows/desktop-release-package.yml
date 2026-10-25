@@ -1,0 +1,171 @@
+name: Build Desktop components and source-layout releases
+
+"on":
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Component platform (no GA or Python bundled)
+        type: choice
+        default: all
+        options: [all, windows, macos, linux]
+      windows_release:
+        description: Also assemble both Windows source-layout ZIPs (no public upload)
+        type: boolean
+        default: false
+      linux_release:
+        description: Also assemble both Linux source-layout archives (no public upload)
+        type: boolean
+        default: false
+      ga_ref:
+        description: GA commit or tag for release assembly
+        type: string
+        default: main
+  push:
+    tags: ["desktop-component-*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }} component
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            bundle: --no-bundle
+          - platform: macos
+            runner: macos-14
+            target: aarch64-apple-darwin
+            bundle: --bundles app
+          - platform: linux
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            bundle: --bundles appimage
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - name: Select platform
+        id: selected
+        shell: bash
+        env:
+          REQUESTED: ${{ inputs.target || 'all' }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [[ "$REQUESTED" == all || "$REQUESTED" == "$PLATFORM" ]]; then
+            echo 'build=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        if: steps.selected.outputs.build == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        if: steps.selected.outputs.build == 'true'
+        with:
+          node-version: 22
+      - name: Linux prerequisites
+        if: steps.selected.outputs.build == 'true' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+        if: steps.selected.outputs.build == 'true'
+        with:
+          toolchain: "1.92.0"
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@63fed3e2fecf6f7b51dc6f043341b79ef82a9ae7
+        if: steps.selected.outputs.build == 'true'
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+      - name: Test renderer and build native component
+        if: steps.selected.outputs.build == 'true'
+        shell: bash
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+          BUNDLE_ARGS: ${{ matrix.bundle }}
+        run: |
+          set -euo pipefail
+          npm install -g npm@11.6.2
+          npm install --package-lock=false
+          npm test
+          npx tsc --noEmit
+          npm run tauri build -- --target "$BUILD_TARGET" $BUNDLE_ARGS
+          npm run test:bundle
+          cargo test --manifest-path src-tauri/Cargo.toml --target "$BUILD_TARGET"
+      - name: Package component only
+        if: steps.selected.outputs.build == 'true'
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          RELEASE="src-tauri/target/$BUILD_TARGET/release"
+          case "$PLATFORM" in
+            windows)
+              cp "$RELEASE/ga-desktop.exe" artifacts/GenericAgent.exe
+              ;;
+            macos)
+              APP="$RELEASE/bundle/macos/GenericAgent.app"
+              test -d "$APP"
+              test ! -d "$APP/Contents/Resources/runtime"
+              lipo -verify_arch arm64 "$APP/Contents/MacOS/ga-desktop"
+              codesign --force --deep --sign - "$APP"
+              codesign --verify --deep --strict "$APP"
+              ditto -c -k --sequesterRsrc --keepParent "$APP" artifacts/GenericAgent-Desktop-macOS-arm64.zip
+              # Verify the actual distributable, not just the build directory.
+              ditto -x -k artifacts/GenericAgent-Desktop-macOS-arm64.zip "$RUNNER_TEMP/desktop-verify"
+              codesign --verify --deep --strict "$RUNNER_TEMP/desktop-verify/GenericAgent.app"
+              ;;
+            linux)
+              shopt -s nullglob
+              images=("$RELEASE"/bundle/appimage/*.AppImage)
+              test "${#images[@]}" -eq 1
+              cp "${images[0]}" artifacts/GenericAgent-Linux-x86_64.AppImage
+              ;;
+          esac
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path('artifacts')
+          files = sorted(root.iterdir())
+          manifest = {'desktop_commit': os.environ['GITHUB_SHA'], 'target': os.environ['BUILD_TARGET'], 'files': {}}
+          for path in files:
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              manifest['files'][path.name] = digest
+              (root / (path.name + '.sha256')).write_text(digest + '  ' + path.name + '\n')
+          (root / ('component-' + os.environ['PLATFORM'] + '.json')).write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+      - name: Checkout GA release source
+        if: steps.selected.outputs.build == 'true' && ((runner.os == 'Windows' && inputs.windows_release) || (runner.os == 'Linux' && inputs.linux_release))
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: lsdefine/GenericAgent
+          ref: ${{ inputs.ga_ref }}
+          path: .ga-runtime/source
+          persist-credentials: false
+      - name: Assemble and verify source-layout releases
+        if: steps.selected.outputs.build == 'true' && ((runner.os == 'Windows' && inputs.windows_release) || (runner.os == 'Linux' && inputs.linux_release))
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          BINARY=artifacts/GenericAgent.exe
+          if [[ "$PLATFORM" == linux ]]; then BINARY=artifacts/GenericAgent-Linux-x86_64.AppImage; fi
+          python scripts/prepare_python.py --platform "$PLATFORM" "$RUNNER_TEMP/ga-python"
+          python scripts/package_release.py --platform "$PLATFORM" --ga-root .ga-runtime/source --exe "$BINARY" --python-dir "$RUNNER_TEMP/ga-python/python" --output "artifacts/$PLATFORM-release"
+          python scripts/verify_release.py --platform "$PLATFORM" "artifacts/$PLATFORM-release"
+      - uses: actions/upload-artifact@v4
+        if: steps.selected.outputs.build == 'true'
+        with:
+          name: desktop-component-${{ matrix.platform }}
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 30

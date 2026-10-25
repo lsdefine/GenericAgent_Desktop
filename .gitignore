@@ -1,0 +1,40 @@
+# Rust build artifacts
+src-tauri/target/
+src-tauri/gen/
+
+# Node
+node_modules/
+package-lock.json
+
+# Local model configuration regression tests
+/src/__tests__/model-selector.test.tsx
+/src/__tests__/runtime-bridge-boundary.test.ts
+
+# Local usage regression tests
+/src/__tests__/usage-ledger-local.test.ts
+/src/__tests__/runtime-state-recovery.test.ts
+
+# Generated and local-only files
+dist/
+artifacts/
+.ga-runtime/
+__pycache__/
+*.py[cod]
+*.log
+.env
+mykey.py
+.DS_Store
+
+spec/
+*.local
+.vite/
+auth.json
+
+# Local composer draft regression tests
+/src/__tests__/composer-drafts-local.test.tsx
+
+# Local timestamp regression test
+/src/__tests__/timestamp-local.test.ts
+
+# Local message-window regression
+/src/__tests__/message-window-local.test.tsx

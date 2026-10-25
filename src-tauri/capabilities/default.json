@@ -1,0 +1,40 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for all windows",
+  "windows": [
+    "main",
+    "setup"
+  ],
+  "remote": {
+    "urls": [
+      "http://127.0.0.1:14168",
+      "http://localhost:14168"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-close",
+    "core:window:allow-get-all-windows",
+    "core:webview:default",
+    "allow-start-bridge",
+    "allow-start-bridge-with-config",
+    "allow-get-config",
+    "allow-export-mykey",
+    "allow-edit-mykey",
+    "allow-open-message-target",
+    "allow-pick-directory",
+    "allow-get-ga-source",
+    "allow-set-ga-source",
+    "allow-clear-ga-source",
+    "allow-move-ga-runtime",
+    "allow-shortcut-should-ask",
+    "allow-shortcut-decide",
+    "allow-bootstrap-bridge",
+    "allow-stop-bridge",
+    "allow-restart-bridge"
+  ]
+}
