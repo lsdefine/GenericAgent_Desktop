@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useCallback, useEffect } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 
 interface Props {
   content: string;
@@ -10,13 +10,6 @@ export const ThinkingPart = memo(function ThinkingPart({ content, isStreaming }:
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const isOpen = userPinned !== null ? userPinned : isStreaming;
-
-  const handleToggle = useCallback(() => {
-    setUserPinned((prev) => {
-      if (prev === null) return !isStreaming;
-      return !prev;
-    });
-  }, [isStreaming]);
 
   useEffect(() => {
     if (isStreaming && isOpen && bodyRef.current) {
@@ -30,10 +23,13 @@ export const ThinkingPart = memo(function ThinkingPart({ content, isStreaming }:
     <details
       data-slot="aui_thinking-disclosure"
       open={isOpen}
-      onToggle={handleToggle}
     >
-      <summary data-slot="thinking-summary">
-        <span className={isStreaming ? 'thinking-shimmer' : ''}>Thinking</span>
+      <summary data-slot="thinking-summary" onClick={(event) => {
+        // Native toggle also fires for React-driven open changes. Only pin on activation.
+        event.preventDefault();
+        setUserPinned(!isOpen);
+      }}>
+        Thinking
       </summary>
       <div
         ref={bodyRef}

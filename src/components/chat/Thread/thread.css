@@ -258,15 +258,6 @@
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 28%, black 100%);
 }
 
-.thinking-shimmer {
-  animation: thinking-shimmer-anim 2s ease-in-out infinite;
-}
-
-@keyframes thinking-shimmer-anim {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
-}
-
 /* ─── Tool Rows ─── */
 [data-slot="tool-block"] {
   display: grid;
