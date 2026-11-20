@@ -1,5 +1,7 @@
 # GenericAgent Desktop
 
+**Release policy:** Desktop CI is disabled. Windows hotfixes are built locally and distributed manually through GitHub Release and the existing VPS download URLs.
+
 Standalone React + Tauri desktop application for [GenericAgent](https://github.com/lsdefine/GenericAgent).
 
 ## Development
