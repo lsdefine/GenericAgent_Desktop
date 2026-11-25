@@ -6,19 +6,7 @@
   flex-direction: column;
 }
 
-/* Drag region — allows window dragging from the top bar area (macOS overlay only) */
-:root[data-platform="macos"] .ga-app-layout::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 38px;
-  -webkit-app-region: drag;
-  z-index: 50;
-}
-
-/* Titlebar controls — positioned after macOS traffic lights */
+/* Sidebar control within the content area below the native titlebar. */
 .ga-titlebar-controls {
   position: fixed;
   top: 8px;
@@ -27,10 +15,6 @@
   display: flex;
   align-items: center;
   gap: 2px;
-}
-
-:root[data-platform="macos"] .ga-titlebar-controls {
-  left: 72px;
 }
 
 .ga-titlebar-btn {

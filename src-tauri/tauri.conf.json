@@ -22,7 +22,7 @@
         "resizable": true,
         "maximized": false,
         "visible": false,
-        "titleBarStyle": "Overlay",
+        "titleBarStyle": "Visible",
         "dragDropEnabled": false,
         "url": "loading.html"
       }
